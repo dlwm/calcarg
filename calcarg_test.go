@@ -13,9 +13,12 @@ func TestCalc(t *testing.T) {
 		panic(err)
 	}
 	for i := 0; i < 100000; i++ {
-		res, _ := calculator.Eval("{\"age\":21,\"health\":60}")
-		_ = res
-		//fmt.Println(res)
+		res, err := calculator.Eval(map[string]float32{
+			"age":    21,
+			"health": 60,
+		})
+		_, _ = res, err
+		//fmt.Println(res, err)
 	}
 	end := time.Now().UnixMilli()
 	fmt.Println(end - start)

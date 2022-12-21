@@ -2,7 +2,6 @@ package calcarg
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -67,19 +66,24 @@ func Analyse(formula string) (*Calculator, error) {
 	return calculator, nil
 }
 
-// Eval 计算公式
-func (c *Calculator) Eval(argsJson string) (int64, error) {
-	args := make(map[string]interface{})
-	err := json.Unmarshal([]byte(argsJson), &args)
-	if err != nil {
-		return 0, err
-	}
+//// Eval 根据参数计算
+//func (c *Calculator) Eval(argsJson string) (int64, error) {
+//	args := make(map[string]interface{})
+//	err := json.Unmarshal([]byte(argsJson), &args)
+//	if err != nil {
+//		return 0, err
+//	}
+//
+//	return eval(c.Root, args)
+//}
 
+// Eval 根据参数计算
+func (c *Calculator) Eval(args map[string]float32) (int64, error) {
 	return eval(c.Root, args)
 }
 
 // 表达式计算
-func eval(exp expression, args map[string]interface{}) (int64, error) {
+func eval(exp expression, args map[string]float32) (int64, error) {
 	switch node := exp.(type) {
 	case *integerLiteralExpression:
 		return node.Value, nil
@@ -89,11 +93,7 @@ func eval(exp expression, args map[string]interface{}) (int64, error) {
 			return 0, errors.New(fmt.Sprintf("Cannot find '%s' in args", node.Key))
 		}
 
-		valueF64, ok := value.(float64)
-		if !ok {
-			return 0, errors.New(fmt.Sprintf("invalid args' value: %v", value))
-		}
-		return int64(valueF64), nil
+		return int64(value), nil
 	case *prefixExpression:
 		rightV, err := eval(node.Right, args)
 		if err != nil {
