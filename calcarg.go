@@ -13,6 +13,8 @@ const (
 	digit  = "DIGIT"  // 数字
 	letter = "LETTER" // 字母
 
+	dot = "." // 小数点
+
 	plus     = "+"
 	minus    = "-"
 	asterisk = "*"
@@ -78,12 +80,12 @@ func Analyse(formula string) (*Calculator, error) {
 //}
 
 // Eval 根据参数计算
-func (c *Calculator) Eval(args map[string]float32) (int64, error) {
+func (c *Calculator) Eval(args map[string]float32) (float32, error) {
 	return eval(c.Root, args)
 }
 
 // 表达式计算
-func eval(exp expression, args map[string]float32) (int64, error) {
+func eval(exp expression, args map[string]float32) (float32, error) {
 	switch node := exp.(type) {
 	case *integerLiteralExpression:
 		return node.Value, nil
@@ -93,7 +95,7 @@ func eval(exp expression, args map[string]float32) (int64, error) {
 			return 0, errors.New(fmt.Sprintf("Cannot find '%s' in args", node.Key))
 		}
 
-		return int64(value), nil
+		return value, nil
 	case *prefixExpression:
 		rightV, err := eval(node.Right, args)
 		if err != nil {
@@ -116,7 +118,7 @@ func eval(exp expression, args map[string]float32) (int64, error) {
 }
 
 // 计算前缀表达式
-func evalPrefixExpression(operator string, right int64) int64 {
+func evalPrefixExpression(operator string, right float32) float32 {
 	if operator != "-" {
 		return 0
 	}
@@ -124,7 +126,7 @@ func evalPrefixExpression(operator string, right int64) int64 {
 }
 
 // 计算双目表达式
-func evalInfixExpression(left int64, operator string, right int64) int64 {
+func evalInfixExpression(left float32, operator string, right float32) float32 {
 	switch operator {
 	case "+":
 		return left + right
@@ -211,6 +213,10 @@ func (l *lexer) nextToken() token {
 	return tok
 }
 
+func isDot(ch byte) bool {
+	return '.' == ch
+}
+
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
@@ -230,8 +236,15 @@ func (l *lexer) readChar() {
 }
 
 func (l *lexer) readNumber() string {
+	HadDot := false
 	position := l.position
-	for isDigit(l.ch) {
+	for isDigit(l.ch) || isDot(l.ch) {
+		if isDot(l.ch) {
+			if HadDot {
+				panic(fmt.Sprintf("incorrect dot use: '%c'", l.ch))
+			}
+			HadDot = true
+		}
 		l.readChar()
 	}
 	return l.input[position:l.position]
@@ -257,7 +270,7 @@ type expression interface {
 
 type integerLiteralExpression struct {
 	Token token
-	Value int64
+	Value float32
 }
 
 func (il *integerLiteralExpression) string() string { return il.Token.Literal }
@@ -417,14 +430,14 @@ func (p *parser) nextToken() {
 func (p *parser) parseIntegerLiteral() expression {
 	lit := &integerLiteralExpression{Token: p.curToken}
 
-	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	value, err := strconv.ParseFloat(p.curToken.Literal, 32)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
 		p.errors = append(p.errors, msg)
 		return nil
 	}
 
-	lit.Value = value
+	lit.Value = float32(value)
 	return lit
 }
 
