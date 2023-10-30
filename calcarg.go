@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -20,6 +21,8 @@ const (
 	asterisk = "*"
 	slash    = "/"
 
+	power = "^"
+
 	lparen = "("
 	rparen = ")"
 
@@ -31,11 +34,12 @@ const (
 const (
 	_ int = iota
 	lowest
-	sum     // +, -
-	product // *, /
-	prefix  // -X
-	call    // (X)
-	escape  // <I>
+	sum            // +, -
+	product        // *, /
+	prefix         // -X
+	exponentiation // ^
+	call           // (X)
+	escape         // <I>
 )
 
 // 优先级对应表
@@ -44,6 +48,7 @@ var precedences = map[string]int{
 	minus:    sum,
 	slash:    product,
 	asterisk: product,
+	power:    exponentiation,
 	lparen:   call,
 	lEscape:  escape,
 }
@@ -56,10 +61,10 @@ type Calculator struct {
 
 // Analyse 解析公式
 func Analyse(formula string) (*Calculator, error) {
-	lexer := newLex(formula)
-	parser := newParser(lexer)
+	lex := newLex(formula)
+	psr := newParser(lex)
 
-	exp := parser.parseExpression(lowest)
+	exp := psr.parseExpression(lowest)
 	calculator := &Calculator{
 		Formula: formula,
 		Root:    exp,
@@ -128,18 +133,20 @@ func evalPrefixExpression(operator string, right float32) float32 {
 // 计算双目表达式
 func evalInfixExpression(left float32, operator string, right float32) float32 {
 	switch operator {
-	case "+":
+	case plus:
 		return left + right
-	case "-":
+	case minus:
 		return left - right
-	case "*":
+	case asterisk:
 		return left * right
-	case "/":
+	case slash:
 		if right != 0 {
 			return left / right
 		} else {
 			return 0
 		}
+	case power:
+		return float32(math.Pow(float64(left), float64(right)))
 	default:
 		return 0
 	}
@@ -192,6 +199,8 @@ func (l *lexer) nextToken() token {
 		tok = newToken(slash, l.ch)
 	case '*':
 		tok = newToken(asterisk, l.ch)
+	case '^':
+		tok = newToken(power, l.ch)
 	case 0:
 		tok.Literal = ""
 		tok.Type = eof
@@ -364,6 +373,7 @@ func newParser(l *lexer) *parser {
 	p.registerInfix(minus, p.parseInfixExpression)
 	p.registerInfix(slash, p.parseInfixExpression)
 	p.registerInfix(asterisk, p.parseInfixExpression)
+	p.registerInfix(power, p.parseInfixExpression)
 
 	p.nextToken()
 	p.nextToken()
@@ -372,8 +382,7 @@ func newParser(l *lexer) *parser {
 }
 
 func (p *parser) parseExpression(precedence int) expression {
-	prefix := p.prefixParseFns[p.curToken.Type]
-	returnExp := prefix()
+	returnExp := p.prefixParseFns[p.curToken.Type]()
 
 	for precedence < p.peekPrecedence() {
 		infix := p.infixParseFns[p.peekToken.Type]
@@ -389,15 +398,15 @@ func (p *parser) parseExpression(precedence int) expression {
 }
 
 func (p *parser) peekPrecedence() int {
-	if p, ok := precedences[p.peekToken.Type]; ok {
-		return p
+	if lvl, ok := precedences[p.peekToken.Type]; ok {
+		return lvl
 	}
 	return lowest
 }
 
 func (p *parser) curPrecedence() int {
-	if p, ok := precedences[p.curToken.Type]; ok {
-		return p
+	if lvl, ok := precedences[p.curToken.Type]; ok {
+		return lvl
 	}
 	return lowest
 }
@@ -451,13 +460,13 @@ func (p *parser) parseLetterLiteral() expression {
 }
 
 func (p *parser) parsePrefixExpression() expression {
-	expression := &prefixExpression{
+	exp := &prefixExpression{
 		Token:    p.curToken,
 		Operator: p.curToken.Literal,
 	}
 	p.nextToken()
-	expression.Right = p.parseExpression(prefix)
-	return expression
+	exp.Right = p.parseExpression(prefix)
+	return exp
 }
 
 func (p *parser) parseGroupedExpression() expression {
@@ -481,7 +490,7 @@ func (p *parser) parseEscapedExpression() expression {
 }
 
 func (p *parser) parseInfixExpression(left expression) expression {
-	expression := &infixExpression{
+	exp := &infixExpression{
 		Token:    p.curToken,
 		Operator: p.curToken.Literal,
 		Left:     left,
@@ -496,7 +505,7 @@ func (p *parser) parseInfixExpression(left expression) expression {
 	//} else {
 	//	expression.Right = p.parseExpression(precedence)
 	//}
-	expression.Right = p.parseExpression(precedence)
+	exp.Right = p.parseExpression(precedence)
 
-	return expression
+	return exp
 }

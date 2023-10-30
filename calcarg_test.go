@@ -8,7 +8,7 @@ import (
 
 func TestCalc(t *testing.T) {
 	start := time.Now().UnixMilli()
-	calculator, err := Analyse("(99-<age>)*<health>/88.88")
+	calculator, err := Analyse("(99-<age>)*<health>/88.88+2^(1/2)^2")
 	if err != nil {
 		panic(err)
 	}
